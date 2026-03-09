@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from typing import Optional, List, Any
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -77,6 +77,19 @@ async def query(req: QueryRequest):
     history.append({"role": "assistant", "content": result["answer"]})
 
     return QueryResponse(**result)
+
+
+# ── History endpoint ─────────────────────────────────────────────────────────
+
+@app.get("/api/history/{session_id}")
+async def history(
+    session_id: str,
+    page_type: str = Query(default="CAREHOME"),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    session_key = f"{session_id}:{page_type}"
+    messages = _sessions.get(session_key, [])
+    return {"session_id": session_id, "page_type": page_type, "messages": messages[-limit:]}
 
 
 # ── Health check ─────────────────────────────────────────────────────────────

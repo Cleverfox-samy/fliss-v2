@@ -33,8 +33,8 @@ TOOLS = [
                 },
                 "radius_km": {
                     "type": "number",
-                    "description": "Search radius in kilometres. Default 50.",
-                    "default": 50,
+                    "description": "Search radius in kilometres. Default 25.",
+                    "default": 25,
                 },
                 "keywords": {
                     "type": "array",
@@ -143,7 +143,7 @@ class ConversationEngine:
                             filters_used = {
                                 "location": block.input.get("location"),
                                 "keywords": block.input.get("keywords", []),
-                                "radius_km": max(block.input.get("radius_km", 50), 50),
+                                "radius_km": block.input.get("radius_km", 25),
                             }
                             if geo:
                                 center_lat = geo["latitude"]
@@ -215,8 +215,8 @@ class ConversationEngine:
         latitude = geo["latitude"] if geo else None
         longitude = geo["longitude"] if geo else None
 
-        # Enforce minimum 50km radius — directory is still growing
-        radius = max(tool_input.get("radius_km", 50), 50)
+        # Default 25km radius — if nothing found, prompt user to expand
+        radius = tool_input.get("radius_km", 25)
         keywords = tool_input.get("keywords")
         limit = tool_input.get("limit", 8)
 

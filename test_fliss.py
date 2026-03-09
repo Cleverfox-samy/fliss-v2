@@ -200,20 +200,28 @@ def test_numbers_only():
 
 def test_wrong_category_nursery_on_carehome():
     d = send("I need a nursery for my toddler", "CAREHOME")
-    passed = check_any(d["answer"], "nursery", "nurseries page", "care home")
+    # Must redirect AND must NOT show results
+    passed = (
+        check_any(d["answer"], "nursery", "nurseries") and
+        len(d["results"]) == 0
+    )
     record("wrong_category_nursery_on_carehome",
            "nursery for toddler (on CAREHOME page)",
-           "Redirects to nurseries page",
-           passed, d["answer"])
+           "Redirects to nurseries page, NO results shown",
+           passed, f"results={len(d['results'])}, answer={d['answer'][:100]}")
 
 
 def test_wrong_category_carehome_on_nursery():
     d = send("I need a care home for my elderly father", "NURSERY")
-    passed = check_any(d["answer"], "care home", "nurseries", "nursery")
+    # Must redirect AND must NOT show results
+    passed = (
+        check_any(d["answer"], "care home", "care homes") and
+        len(d["results"]) == 0
+    )
     record("wrong_category_carehome_on_nursery",
            "care home for father (on NURSERY page)",
-           "Redirects to care homes page",
-           passed, d["answer"])
+           "Redirects to care homes page, NO results shown",
+           passed, f"results={len(d['results'])}, answer={d['answer'][:100]}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -471,6 +479,17 @@ def test_fallback_condition_still_mentioned():
            passed, d["answer"])
 
 
+def test_no_dementia_filter_caveat():
+    """Should NOT say 'couldn't filter for dementia' or similar."""
+    d = send("care home in Brighton for my mum with dementia")
+    passed = check_none(d["answer"], "couldn't specifically filter",
+                        "couldn't filter for dementia", "unable to filter")
+    record("no_dementia_filter_caveat",
+           "care home Brighton dementia",
+           "Does NOT apologise for not filtering by condition",
+           passed, d["answer"])
+
+
 def test_zero_results_graceful():
     d = send("care homes in Inverness")
     if len(d["results"]) == 0:
@@ -585,6 +604,132 @@ def test_signoff_wording():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# SHOW MORE RESULTS TEST
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_show_more_offer():
+    """After showing results, should offer to show more options."""
+    d = send("care homes in London for my dad")
+    passed = check_any(d["answer"], "more options", "show you more", "see more",
+                       "more results")
+    record("show_more_offer",
+           "care homes in London",
+           "Offers to show more options after results",
+           passed, d["answer"])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEEP DIVE + ORGANISATION LINKS TESTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_deep_dive_offer():
+    """After informational response, should offer to go into more detail."""
+    d = send("what is dementia?")
+    passed = check_any(d["answer"], "more detail", "go into more", "further",
+                       "dementiauk.org", "alzheimers.org.uk")
+    record("deep_dive_offer",
+           "what is dementia?",
+           "Offers more detail or includes org links",
+           passed, d["answer"])
+
+
+def test_org_links_funding():
+    """Funding info should include relevant org links."""
+    d = send("how does care home funding work?")
+    passed = check_any(d["answer"], "gov.uk", "ageuk.org.uk", "age uk",
+                       "citizensadvice.org.uk")
+    record("org_links_funding",
+           "how does care home funding work?",
+           "Includes relevant organisation links",
+           passed, d["answer"])
+
+
+def test_org_links_dementia():
+    """Dementia info should include dementia org links."""
+    d = send("tell me about dementia care")
+    passed = check_any(d["answer"], "dementiauk.org", "alzheimers.org.uk",
+                       "dementia uk", "alzheimer's society")
+    record("org_links_dementia",
+           "tell me about dementia care",
+           "Includes dementia organisation links",
+           passed, d["answer"])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# NO EXTERNAL SEARCH SUGGESTION TEST
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_no_external_search():
+    """Should NEVER suggest searching externally."""
+    d = send("I need childcare in Leeds", "CAREHOME")
+    passed = check_none(d["answer"], "try searching for", "search for childcare",
+                        "search for daycare", "search online")
+    record("no_external_search",
+           "childcare in Leeds (on CAREHOME page)",
+           "Does NOT suggest external searching",
+           passed, d["answer"])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HOME CARE PAGE BEHAVIOUR TEST
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_homecare_shows_homecare_first():
+    """On Home Care page, should show home care results first, not redirect."""
+    d = send("my nan is 85 and quite frail, she needs help at home in London", "HOMECARE")
+    # Should show home care results, not redirect to care homes
+    passed = (
+        len(d["results"]) > 0
+        and check_any(d["answer"], "home care", "care provider", "found")
+    )
+    record("homecare_shows_homecare_first",
+           "frail 85yo nan in London (HOMECARE page)",
+           "Shows home care results first, not redirect",
+           passed, f"results={len(d['results'])}, answer={d['answer'][:100]}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# WELLBEING CHECK-IN TEST
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_wellbeing_checkin():
+    """Wellbeing check-in must be offered before closing."""
+    responses = send_conversation([
+        "care homes in Manchester for my mum with dementia",
+        "no thanks, that's all",
+    ])
+    # After user says they're done, should get wellbeing check-in
+    final = responses[-1]["answer"]
+    passed = check_any(final, "holding up", "look after yourself", "how are you",
+                       "wellbeing", "self-care", "yourself too")
+    record("wellbeing_checkin",
+           "Conversation winds down",
+           "Wellbeing check-in offered before closing",
+           passed, final)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TYPO RECOVERY TEST
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_typo_recovery():
+    """After typo correction, conversation should continue smoothly."""
+    responses = send_conversation([
+        "care homes in Mnchester for my mum",
+        "sorry, I meant Manchester",
+    ])
+    # After correction, should proceed with Manchester search
+    r1 = responses[1]
+    passed = (
+        check_any(r1["answer"], "manchester", "found", "options", "results")
+    )
+    record("typo_recovery",
+           "Misspell then correct Manchester",
+           "Continues smoothly after typo correction",
+           passed, r1["answer"])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # RUNNER
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -634,6 +779,7 @@ ALL_TESTS = [
     test_fallback_parkinsons,
     test_fallback_rare_condition,
     test_fallback_condition_still_mentioned,
+    test_no_dementia_filter_caveat,
     test_zero_results_graceful,
     # Page types
     test_carehome_page,
@@ -643,6 +789,15 @@ ALL_TESTS = [
     test_full_conversation,
     # Sign-off
     test_signoff_wording,
+    # Nathan's fixes
+    test_show_more_offer,
+    test_deep_dive_offer,
+    test_org_links_funding,
+    test_org_links_dementia,
+    test_no_external_search,
+    test_homecare_shows_homecare_first,
+    test_wellbeing_checkin,
+    test_typo_recovery,
 ]
 
 

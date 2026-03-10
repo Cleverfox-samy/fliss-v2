@@ -74,7 +74,12 @@ async def query(req: QueryRequest):
 
     # Append to conversation history for next turn
     history.append({"role": "user", "content": req.query})
-    history.append({"role": "assistant", "content": result["answer"]})
+    assistant_msg = {"role": "assistant", "content": result["answer"]}
+    if result.get("results"):
+        assistant_msg["results"] = result["results"]
+    if result.get("title"):
+        assistant_msg["title"] = result["title"]
+    history.append(assistant_msg)
 
     return QueryResponse(**result)
 

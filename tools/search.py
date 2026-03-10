@@ -164,6 +164,146 @@ async def search_listings(
         return results
 
 
+# ── Jobs search ──────────────────────────────────────────────────────────────
+
+async def search_jobs(
+    latitude: float | None = None,
+    longitude: float | None = None,
+    radius_km: float = 25.0,
+    keywords: list[str] | None = None,
+    job_type: str | None = None,
+    limit: int = 8,
+) -> list[dict]:
+    """Search jobs in the Caretopia Postgres database.
+
+    Joins to organisations table for geo coordinates.
+
+    Args:
+        latitude: Latitude for geo search (from geocoding).
+        longitude: Longitude for geo search (from geocoding).
+        radius_km: Search radius in kilometres.
+        keywords: Job title, role, or skill keywords to filter by.
+        job_type: FULLTIME, PARTTIME, TEMPORARY, CONTRACT, FLEXIBLE, INTERNSHIP.
+        limit: Max results (default 8).
+    """
+    settings = get_settings()
+    if not settings.use_live_db:
+        return _filter_test_jobs(keywords, limit)
+
+    pool = await get_pool()
+
+    conditions = [
+        "j.status = 'ACTIVE'",
+    ]
+    params: list = []
+    param_idx = 1
+
+    # Haversine geo filter via the joined organisation
+    if latitude is not None and longitude is not None:
+        conditions.append(f"""
+            o.latitude IS NOT NULL AND o.longitude IS NOT NULL AND
+            (6371 * acos(
+                LEAST(GREATEST(
+                    cos(radians(${param_idx})) * cos(radians(o.latitude))
+                    * cos(radians(o.longitude) - radians(${param_idx + 1}))
+                    + sin(radians(${param_idx})) * sin(radians(o.latitude))
+                , -1), 1)
+            )) <= ${param_idx + 2}
+        """)
+        params.extend([latitude, longitude, radius_km])
+        param_idx += 3
+
+    # Job type filter
+    if job_type:
+        conditions.append(f"j.\"jobType\" = ${param_idx}")
+        params.append(job_type)
+        param_idx += 1
+
+    # Keyword filter — match against title, jobRole, or summary
+    kw_list = keywords or []
+    if kw_list:
+        kw_conditions = []
+        for kw in kw_list:
+            kw_conditions.append(
+                f"(j.title ILIKE ${param_idx} OR j.\"jobRole\" ILIKE ${param_idx} "
+                f"OR j.summary ILIKE ${param_idx} OR j.location ILIKE ${param_idx})"
+            )
+            params.append(f"%{kw}%")
+            param_idx += 1
+        conditions.append(f"({' OR '.join(kw_conditions)})")
+
+    where_clause = " AND ".join(conditions)
+
+    # Build distance calculation
+    if latitude is not None and longitude is not None:
+        lat_p = next(i for i, v in enumerate(params, 1) if v == latitude)
+        lng_p = lat_p + 1
+        distance_expr = f""",
+            round((6371 * acos(
+                LEAST(GREATEST(
+                    cos(radians(${lat_p})) * cos(radians(o.latitude))
+                    * cos(radians(o.longitude) - radians(${lng_p}))
+                    + sin(radians(${lat_p})) * sin(radians(o.latitude))
+                , -1), 1)
+            ))::numeric, 2) AS distance_km
+        """
+        order_clause = "ORDER BY distance_km ASC"
+    else:
+        distance_expr = ""
+        order_clause = 'ORDER BY j."createdAt" DESC'
+
+    query = f"""
+        SELECT
+            j.id,
+            j.title,
+            j."jobRole",
+            j."jobType",
+            j.location AS "jobLocation",
+            j.summary,
+            j."minSalaryRange",
+            j."maxSalaryRange",
+            j."minWorkTime",
+            j."maxWorkTime",
+            j.shifts,
+            j."minExperience",
+            j."maxExperience",
+            j."whyWorkHere",
+            j."startTime",
+            j."expireTime",
+            j.qualifications,
+            j."createdAt",
+            o.id AS "organisationId",
+            o."organisationName",
+            o."townCity",
+            o.postcode,
+            o.latitude,
+            o.longitude,
+            o."logoUrl",
+            o.slug AS "orgSlug"
+            {distance_expr}
+        FROM jobs j
+        LEFT JOIN organisations o ON j."organizationId" = o.id
+        WHERE {where_clause}
+        {order_clause}
+        LIMIT ${param_idx}
+    """
+    params.append(limit)
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(query, *params)
+        results = []
+        for row in rows:
+            r = dict(row)
+            if r.get("latitude") is not None:
+                r["latitude"] = float(r["latitude"])
+            if r.get("longitude") is not None:
+                r["longitude"] = float(r["longitude"])
+            if r.get("distance_km") is not None:
+                r["distance_km"] = float(r["distance_km"])
+            results.append(r)
+        return results
+
+
 # ── Test data fallback (no DB) ───────────────────────────────────────────────
 
 TEST_CARE_HOMES = [
@@ -207,11 +347,49 @@ TEST_HOME_CARE = [
     },
 ]
 
+TEST_JOBS = [
+    {
+        "id": 301, "title": "Care Assistant", "jobRole": "Care Assistant",
+        "jobType": "FULLTIME", "jobLocation": "Brighton", "shifts": "MORNING",
+        "summary": "Caring for elderly residents in a supportive environment.",
+        "minSalaryRange": "22000", "maxSalaryRange": 26000,
+        "minExperience": 0, "maxExperience": 2,
+        "organisationName": "Sunrise Manor Care Home", "townCity": "Brighton",
+        "postcode": "BN2 1TL", "latitude": 50.8194, "longitude": -0.1235,
+    },
+    {
+        "id": 302, "title": "Senior Nurse", "jobRole": "Nurse",
+        "jobType": "FULLTIME", "jobLocation": "Brighton", "shifts": "NIGHT",
+        "summary": "Experienced nurse needed for dementia unit.",
+        "minSalaryRange": "32000", "maxSalaryRange": 38000,
+        "minExperience": 3, "maxExperience": 10,
+        "organisationName": "The Willows Nursing Home", "townCity": "Brighton",
+        "postcode": "BN1 6AF", "latitude": 50.8411, "longitude": -0.1494,
+    },
+]
+
 TEST_DATA = {
     "CAREHOME": TEST_CARE_HOMES,
     "NURSERY": TEST_NURSERIES,
     "HOMECARE": TEST_HOME_CARE,
 }
+
+
+def _filter_test_jobs(keywords: list[str] | None, limit: int) -> list[dict]:
+    listings = TEST_JOBS[:]
+    if keywords:
+        filtered = [
+            l for l in listings
+            if any(
+                kw.lower() in (l.get("title", "") + " " + l.get("summary", "") + " " + l.get("jobRole", "")).lower()
+                for kw in keywords
+            )
+        ]
+        listings = filtered or listings
+    results = []
+    for i, listing in enumerate(listings[:limit]):
+        results.append({**listing, "distance_km": round(1.2 + i * 1.8, 1)})
+    return results
 
 
 def _filter_test_data(page_type: str, keywords: list[str] | None, limit: int) -> list[dict]:

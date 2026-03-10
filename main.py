@@ -148,6 +148,7 @@ async def test_ui():
     <option value="CAREHOME">Care Homes</option>
     <option value="NURSERY">Nurseries</option>
     <option value="HOMECARE">Home Care</option>
+    <option value="JOBS">Jobs</option>
   </select>
 </div>
 <div class="chat" id="chat"></div>

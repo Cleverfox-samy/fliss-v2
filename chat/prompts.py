@@ -183,12 +183,14 @@ PAGE_TYPE_LABELS = {
     "care_homes": "care homes",
     "nurseries": "nurseries",
     "home_care": "home care providers",
+    "jobs": "care sector jobs",
 }
 
 PAGE_TYPE_SINGLES = {
     "care_homes": "care home",
     "nurseries": "nursery",
     "home_care": "home care provider",
+    "jobs": "job",
 }
 
 CARE_HOME_EXTRAS = """
@@ -225,10 +227,31 @@ those results. Then, after presenting home care options, gently suggest:
 Do NOT immediately redirect to care homes. The user came to the Home Care page for a
 reason — respect that by showing home care results first."""
 
+JOBS_EXTRAS = """
+
+JOBS SPECIFIC GUIDANCE:
+- You are helping people find jobs in the care sector on Caretopia.
+- Key questions: what role they're looking for, location, full-time/part-time preference,
+  shift preference (morning, evening, night), experience level, salary expectations.
+- Common roles: care assistant, senior carer, nurse, support worker, caregiver,
+  activities coordinator, care home manager, recruiter, admin.
+- Job types available: FULLTIME, PARTTIME, TEMPORARY, CONTRACT, FLEXIBLE, INTERNSHIP.
+- Shifts available: MORNING, EVENING, NIGHT.
+- When presenting job results, highlight: job title, organisation name, location,
+  salary range, job type, shifts, and experience required.
+- After showing results, say: "You can view the full job details and apply directly
+  through each listing."
+- If someone asks about non-care-sector jobs, say: "I can only help with care sector
+  jobs on Caretopia. For other roles, you might want to check out general job boards."
+- Do NOT use the search_knowledge_base tool for job queries — use search_jobs instead.
+- When gathering info, adapt the examples: ask about what kind of role they want,
+  where they'd like to work, and whether they have a preference for hours or shifts."""
+
 EXTRAS = {
     "care_homes": CARE_HOME_EXTRAS,
     "nurseries": NURSERY_EXTRAS,
     "home_care": HOME_CARE_EXTRAS,
+    "jobs": JOBS_EXTRAS,
 }
 
 

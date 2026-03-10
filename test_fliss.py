@@ -798,7 +798,39 @@ ALL_TESTS = [
     test_homecare_shows_homecare_first,
     test_wellbeing_checkin,
     test_typo_recovery,
+    # Jobs
+    test_jobs_greeting,
+    test_jobs_search,
+    test_jobs_no_location,
 ]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# JOBS TESTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_jobs_greeting():
+    d = send("hello", "JOBS")
+    passed = check_any(d["answer"], "fliss", "help", "job", "role")
+    record("jobs_greeting", "hello (JOBS page)",
+           "Introduces self on jobs page",
+           passed, d["answer"])
+
+
+def test_jobs_search():
+    d = send("care assistant jobs in London", "JOBS")
+    passed = len(d["results"]) > 0 or check_any(d["answer"], "found", "job", "london")
+    record("jobs_search", "care assistant jobs in London",
+           "Returns job results or acknowledges search",
+           passed, f"results={len(d['results'])}, answer={d['answer'][:100]}")
+
+
+def test_jobs_no_location():
+    d = send("I'm looking for a nursing job", "JOBS")
+    passed = check_any(d["answer"], "where", "location", "area", "whereabouts")
+    record("jobs_no_location", "nursing job (no location)",
+           "Asks for location before searching",
+           passed, d["answer"])
 
 
 def main():

@@ -127,6 +127,8 @@ CRITICAL RULES:
   just yet — our directory is growing every day. You could try a nearby area, or I can
   help you with general information about finding {page_type_label}."
 - NEVER make up phone numbers, addresses, ratings, or any other provider details.
+- NEVER assume, guess, or invent a location. If the user has not mentioned a location,
+  ask for one. Do not use any location from previous sessions or make one up.
 - If a search returns results, ONLY describe providers from those results.
 - NEVER suggest searching externally. Never say "try searching for childcare" or
   "try searching for daycare" or anything that sounds like sending the user to Google.

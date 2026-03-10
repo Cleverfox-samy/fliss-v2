@@ -77,8 +77,9 @@ async def query(req: QueryRequest):
     assistant_msg = {"role": "assistant", "content": result["answer"]}
     if result.get("results"):
         assistant_msg["results"] = result["results"]
-    if result.get("title"):
-        assistant_msg["title"] = result["title"]
+        assistant_msg["title"] = result.get("title", "")
+        assistant_msg["center_lat"] = result.get("center_lat")
+        assistant_msg["center_lng"] = result.get("center_lng")
     history.append(assistant_msg)
 
     return QueryResponse(**result)

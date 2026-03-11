@@ -109,9 +109,13 @@ def test_greeting_hey():
 
 def test_single_location_only():
     d = send("Brighton")
-    passed = check_any(d["answer"], "who", "looking for", "searching for", "help")
-    record("single_location_only", "Brighton", "Asks who it's for or offers help",
-           passed, d["answer"])
+    passed = (
+        check_any(d["answer"], "who", "looking for", "searching for", "help")
+        and len(d["results"]) == 0
+    )
+    record("single_location_only", "Brighton",
+           "Asks who it's for, NO results returned",
+           passed, f"results={len(d['results'])}, answer={d['answer'][:120]}")
 
 
 def test_single_who_only():
@@ -119,6 +123,19 @@ def test_single_who_only():
     passed = check_any(d["answer"], "where", "location", "area", "whereabouts")
     record("single_who_only", "my mum needs care", "Asks for location",
            passed, d["answer"])
+
+
+def test_single_location_no_search():
+    """Location + intent but no who — must NOT search, must ask who."""
+    d = send("care homes in Brighton")
+    passed = (
+        check_any(d["answer"], "who", "looking for", "searching for")
+        and len(d["results"]) == 0
+    )
+    record("single_location_no_search",
+           "care homes in Brighton (no who)",
+           "Asks who it's for, does NOT search",
+           passed, f"results={len(d['results'])}, answer={d['answer'][:120]}")
 
 
 def test_single_condition_only():
@@ -411,7 +428,7 @@ def test_results_step6_offer():
 
 
 def test_results_have_provider_data():
-    d = send("nurseries in Essex", "NURSERY")
+    d = send("nurseries in Essex for my son", "NURSERY")
     if len(d["results"]) > 0:
         r = d["results"][0]
         has_name = bool(r.get("organisationName"))
@@ -429,10 +446,10 @@ def test_results_have_provider_data():
 
 
 def test_results_center_coords():
-    d = send("care homes in Manchester")
+    d = send("care homes in Manchester for my mum")
     passed = d["center_lat"] is not None and d["center_lng"] is not None
     record("results_center_coords",
-           "care homes in Manchester",
+           "care homes in Manchester for my mum",
            "Response includes center_lat and center_lng",
            passed, f"lat={d['center_lat']}, lng={d['center_lng']}")
 
@@ -442,19 +459,19 @@ def test_results_center_coords():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def test_fallback_adhd_nursery():
-    d = send("nurseries in London with ADHD support", "NURSERY")
+    d = send("nurseries in London with ADHD support for my daughter", "NURSERY")
     passed = len(d["results"]) > 0
     record("fallback_adhd_nursery",
-           "nurseries in London with ADHD support",
+           "nurseries in London ADHD support for my daughter",
            "Returns results (location fallback) even if no ADHD keyword match",
            passed, f"{len(d['results'])} results returned")
 
 
 def test_fallback_parkinsons():
-    d = send("care home in Manchester for someone with Parkinson's")
+    d = send("care home in Manchester for my dad with Parkinson's")
     passed = len(d["results"]) > 0
     record("fallback_parkinsons",
-           "care home in Manchester, Parkinson's",
+           "care home in Manchester for my dad, Parkinson's",
            "Returns results via location fallback",
            passed, f"{len(d['results'])} results")
 
@@ -470,11 +487,11 @@ def test_fallback_rare_condition():
 
 def test_fallback_condition_still_mentioned():
     """Even with keyword fallback, the condition should be acknowledged."""
-    d = send("care home in Manchester for Parkinson's")
+    d = send("care home in Manchester for my nan with Parkinson's")
     passed = check_any(d["answer"], "parkinson", "condition", "ask", "directly",
                        "recommend", "contact")
     record("fallback_condition_acknowledged",
-           "care home Manchester Parkinson's",
+           "care home Manchester my nan Parkinson's",
            "Condition acknowledged in response even without keyword match",
            passed, d["answer"])
 
@@ -491,7 +508,7 @@ def test_no_dementia_filter_caveat():
 
 
 def test_zero_results_graceful():
-    d = send("care homes in Inverness")
+    d = send("care homes in Inverness for my dad")
     if len(d["results"]) == 0:
         passed = check_any(d["answer"], "wasn't able to find", "couldn't find",
                            "no results", "growing", "try", "nearby", "wider",
@@ -512,9 +529,9 @@ def test_zero_results_graceful():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def test_carehome_page():
-    d = send("care homes in London", "CAREHOME")
+    d = send("care homes in London for my father", "CAREHOME")
     passed = d["intent"] in ("listings", "clarify") and len(d["results"]) >= 0
-    record("carehome_page", "care homes in London (CAREHOME)",
+    record("carehome_page", "care homes in London for my father (CAREHOME)",
            "Works on CAREHOME page",
            passed, f"intent={d['intent']}, results={len(d['results'])}")
 
@@ -730,6 +747,34 @@ def test_typo_recovery():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# JOBS TESTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_jobs_greeting():
+    d = send("hello", "JOBS")
+    passed = check_any(d["answer"], "fliss", "help", "job", "role")
+    record("jobs_greeting", "hello (JOBS page)",
+           "Introduces self on jobs page",
+           passed, d["answer"])
+
+
+def test_jobs_search():
+    d = send("care assistant jobs in London", "JOBS")
+    passed = len(d["results"]) > 0 or check_any(d["answer"], "found", "job", "london")
+    record("jobs_search", "care assistant jobs in London",
+           "Returns job results or acknowledges search",
+           passed, f"results={len(d['results'])}, answer={d['answer'][:100]}")
+
+
+def test_jobs_no_location():
+    d = send("I'm looking for a nursing job", "JOBS")
+    passed = check_any(d["answer"], "where", "location", "area", "whereabouts")
+    record("jobs_no_location", "nursing job (no location)",
+           "Asks for location before searching",
+           passed, d["answer"])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # RUNNER
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -740,6 +785,7 @@ ALL_TESTS = [
     test_greeting_hey,
     # Single info
     test_single_location_only,
+    test_single_location_no_search,
     test_single_who_only,
     test_single_condition_only,
     # Multi-info extraction
@@ -803,34 +849,6 @@ ALL_TESTS = [
     test_jobs_search,
     test_jobs_no_location,
 ]
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# JOBS TESTS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def test_jobs_greeting():
-    d = send("hello", "JOBS")
-    passed = check_any(d["answer"], "fliss", "help", "job", "role")
-    record("jobs_greeting", "hello (JOBS page)",
-           "Introduces self on jobs page",
-           passed, d["answer"])
-
-
-def test_jobs_search():
-    d = send("care assistant jobs in London", "JOBS")
-    passed = len(d["results"]) > 0 or check_any(d["answer"], "found", "job", "london")
-    record("jobs_search", "care assistant jobs in London",
-           "Returns job results or acknowledges search",
-           passed, f"results={len(d['results'])}, answer={d['answer'][:100]}")
-
-
-def test_jobs_no_location():
-    d = send("I'm looking for a nursing job", "JOBS")
-    passed = check_any(d["answer"], "where", "location", "area", "whereabouts")
-    record("jobs_no_location", "nursing job (no location)",
-           "Asks for location before searching",
-           passed, d["answer"])
 
 
 def main():

@@ -121,6 +121,44 @@ def get_tools(frontend_type: str) -> list[dict]:
     return TOOLS_LISTINGS + [TOOL_KNOWLEDGE]
 
 
+# Words that indicate "who" the care is for — relationship terms, self-references
+WHO_INDICATORS = [
+    # Family relationships
+    "mum", "mom", "mother", "dad", "father", "parent", "parents",
+    "nan", "nana", "nanny", "grandmother", "grandma", "grandad",
+    "grandfather", "grandpa", "gran",
+    "son", "daughter", "child", "children", "kid", "kids", "baby",
+    "toddler", "boy", "girl",
+    "wife", "husband", "partner", "spouse",
+    "brother", "sister", "sibling",
+    "uncle", "aunt", "auntie",
+    "friend", "neighbour", "neighbor",
+    # Self-references
+    "myself", "i need care", "i'm looking for care for me",
+    # Generic person references
+    "year old", "years old", "yo ",
+    "elderly", "loved one",
+    # Possessive patterns that imply who
+    "my ",  # "my mum", "my daughter", etc.
+    "our ",  # "our mother"
+]
+
+
+def _conversation_mentions_who(messages: list[dict]) -> bool:
+    """Check if any message in the conversation mentions who the care is for."""
+    for msg in messages:
+        if msg.get("role") != "user":
+            continue
+        content = msg.get("content", "")
+        if not isinstance(content, str):
+            continue
+        text = content.lower()
+        for indicator in WHO_INDICATORS:
+            if indicator in text:
+                return True
+    return False
+
+
 class ConversationEngine:
     def __init__(self, frontend_type: str):
         """
@@ -188,6 +226,18 @@ class ConversationEngine:
                 for block in assistant_content:
                     if block.type == "tool_use":
                         if block.name == "search_listings":
+                            # GUARD: Block search if "who" hasn't been mentioned
+                            if not _conversation_mentions_who(messages):
+                                result_json = json.dumps({
+                                    "error": "BLOCKED: Cannot search yet. You must first ask the user who the care is for. Ask a clarifying question like 'And who are you looking for care for?' before searching.",
+                                    "action": "ask_who",
+                                })
+                                tool_results.append({
+                                    "type": "tool_result",
+                                    "tool_use_id": block.id,
+                                    "content": result_json,
+                                })
+                                continue
                             result_json, raw_results, geo = await self._handle_search(block.input)
                             search_performed = True
                             listings_results = raw_results

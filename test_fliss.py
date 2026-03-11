@@ -4,11 +4,12 @@ Runs against the live server at http://localhost:8000/api/query
 """
 from __future__ import annotations
 import httpx
+import os
 import uuid
 import sys
 import time
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
 TIMEOUT = 90
 
 

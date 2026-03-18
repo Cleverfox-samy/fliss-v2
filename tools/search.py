@@ -139,7 +139,8 @@ async def search_listings(
             o."companyStatus",
             o."inclusiveNursery",
             o."createdAt",
-            o."socialMedia"
+            o."socialMedia",
+            o."averageRating"
             {distance_expr}
         FROM organisations o
         WHERE {where_clause}
@@ -160,10 +161,9 @@ async def search_listings(
                 r["longitude"] = float(r["longitude"])
             if r.get("distance_km") is not None:
                 r["distance_km"] = float(r["distance_km"])
-            # Ensure slug and overallRating are present; totalRate is numeric (0 until we have ratings data)
             r.setdefault("slug", None)
             r.setdefault("overallRating", None)
-            r["totalRate"] = 0
+            r["totalRate"] = float(r["averageRating"]) if r.get("averageRating") is not None else 0
             results.append(r)
         return results
 
@@ -412,6 +412,6 @@ def _filter_test_data(page_type: str, keywords: list[str] | None, limit: int) ->
         r = {**listing, "distance_km": round(1.2 + i * 1.8, 1)}
         r.setdefault("slug", None)
         r.setdefault("overallRating", None)
-        r["totalRate"] = 0
+        r["totalRate"] = float(r["averageRating"]) if r.get("averageRating") is not None else 0
         results.append(r)
     return results

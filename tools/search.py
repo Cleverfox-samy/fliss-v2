@@ -160,6 +160,10 @@ async def search_listings(
                 r["longitude"] = float(r["longitude"])
             if r.get("distance_km") is not None:
                 r["distance_km"] = float(r["distance_km"])
+            # Ensure slug and overallRating are present; add totalRate alias
+            r.setdefault("slug", None)
+            r.setdefault("overallRating", None)
+            r["totalRate"] = r["overallRating"]
             results.append(r)
         return results
 
@@ -405,5 +409,9 @@ def _filter_test_data(page_type: str, keywords: list[str] | None, limit: int) ->
         listings = filtered or listings
     results = []
     for i, listing in enumerate(listings[:limit]):
-        results.append({**listing, "distance_km": round(1.2 + i * 1.8, 1)})
+        r = {**listing, "distance_km": round(1.2 + i * 1.8, 1)}
+        r.setdefault("slug", None)
+        r.setdefault("overallRating", None)
+        r["totalRate"] = r["overallRating"]
+        results.append(r)
     return results

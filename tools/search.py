@@ -5,6 +5,26 @@ from config import get_settings
 
 _pool: asyncpg.Pool | None = None
 
+RATING_TEXT_TO_NUMBER = {
+    "outstanding": 5,
+    "good": 4,
+    "requires improvement": 2,
+    "inadequate": 1,
+}
+
+
+def _rating_to_number(value) -> float:
+    """Convert an overallRating to a numeric totalRate."""
+    if value is None:
+        return 0
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        pass
+    return float(RATING_TEXT_TO_NUMBER.get(str(value).strip().lower(), 0))
+
 # Map from our internal types to the DB enum values
 TYPE_MAP = {
     "CAREHOME": "CAREHOME",
@@ -162,7 +182,7 @@ async def search_listings(
                 r["distance_km"] = float(r["distance_km"])
             r.setdefault("slug", None)
             r.setdefault("overallRating", None)
-            r["totalRate"] = float(r["overallRating"]) if r.get("overallRating") is not None else 0
+            r["totalRate"] = _rating_to_number(r.get("overallRating"))
             results.append(r)
         return results
 

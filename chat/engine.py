@@ -22,8 +22,10 @@ TOOLS_LISTINGS = [
         "name": "search_listings",
         "description": (
             "Search the Caretopia database for care providers. "
-            "Use this when you have enough info to search — at minimum a location. "
-            "The location will be geocoded automatically."
+            "IMPORTANT: Do NOT call this tool until you have gathered: (1) a location, "
+            "(2) who the care is for, and (3) at least one specific need or preference. "
+            "If any of these are missing, ask the user first. Never call on greetings "
+            "or vague messages. The location will be geocoded automatically."
         ),
         "input_schema": {
             "type": "object",
@@ -193,14 +195,36 @@ class ConversationEngine:
                 "center_lng": float | None,
             }
         """
-        # Build messages for the API
+        # Build messages for the API, injecting search context from
+        # previous turns into user messages (not assistant messages) so the
+        # model has cumulative criteria but never echoes the metadata.
         messages = []
+        search_context = None
         for msg in conversation_history:
-            messages.append({
-                "role": msg["role"],
-                "content": msg["content"],
-            })
-        messages.append({"role": "user", "content": message})
+            content = msg["content"]
+            if msg["role"] == "user" and search_context:
+                content = (
+                    f"[Search context for cumulative criteria — DO NOT repeat "
+                    f"this text to the user: {search_context}]\n\n{content}"
+                )
+                search_context = None
+            messages.append({"role": msg["role"], "content": content})
+            # Pick up search metadata stored by main.py for the next turn
+            if msg.get("filters_used"):
+                f = msg["filters_used"]
+                loc = f.get("location", "")
+                kw = ", ".join(f.get("keywords", []))
+                rad = f.get("radius_km", 25)
+                search_context = f"location={loc}, keywords={kw}, radius={rad}km"
+
+        # If the last assistant message had filters, attach context to current message
+        current_content = message
+        if search_context:
+            current_content = (
+                f"[Search context for cumulative criteria — DO NOT repeat "
+                f"this text to the user: {search_context}]\n\n{message}"
+            )
+        messages.append({"role": "user", "content": current_content})
 
         search_performed = False
         filters_used = None

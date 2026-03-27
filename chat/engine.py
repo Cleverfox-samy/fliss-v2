@@ -40,7 +40,7 @@ TOOLS_LISTINGS = [
                 "keywords": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "ALL conditions, specialisms, or requirements mentioned so far in the conversation (e.g. 'dementia', 'nursing', 'garden'). Always include keywords from previous searches plus any new ones.",
+                    "description": "CRITICAL: Must include ALL conditions, specialisms, preferences, and requirements mentioned ANYWHERE in the entire conversation history — not just the latest message. Re-read every user message and collect every criterion. Example: if user mentioned 'dementia' earlier and now says 'garden', pass BOTH ['dementia', 'garden']. Never drop previous keywords.",
                 },
                 "limit": {
                     "type": "integer",

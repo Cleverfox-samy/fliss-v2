@@ -40,7 +40,7 @@ TOOLS_LISTINGS = [
                 "keywords": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Conditions, specialisms, or requirements to filter by (e.g. 'dementia', 'nursing', 'ADHD').",
+                    "description": "ALL conditions, specialisms, or requirements mentioned so far in the conversation (e.g. 'dementia', 'nursing', 'garden'). Always include keywords from previous searches plus any new ones.",
                 },
                 "limit": {
                     "type": "integer",
@@ -313,6 +313,7 @@ class ConversationEngine:
                     "title": title,
                     "center_lat": center_lat,
                     "center_lng": center_lng,
+                    "filters_used": filters_used,
                 }
 
     async def _handle_search(self, tool_input: dict) -> tuple:

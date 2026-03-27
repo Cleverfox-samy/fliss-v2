@@ -74,7 +74,19 @@ async def query(req: QueryRequest):
 
     # Append to conversation history for next turn
     history.append({"role": "user", "content": req.query})
-    assistant_msg = {"role": "assistant", "content": result["answer"]}
+    # Build stored content — include search metadata so the model can see
+    # what was previously searched and build cumulative criteria next time
+    stored_content = result["answer"]
+    filters_used = result.get("filters_used")
+    if filters_used:
+        location = filters_used.get("location", "")
+        keywords = ", ".join(filters_used.get("keywords", []))
+        radius = filters_used.get("radius_km", 25)
+        stored_content += (
+            f"\n\n[Previous search: location={location}"
+            f", keywords={keywords}, radius={radius}km]"
+        )
+    assistant_msg = {"role": "assistant", "content": stored_content}
     if result.get("results"):
         assistant_msg["results"] = result["results"]
         assistant_msg["title"] = result.get("title", "")

@@ -134,9 +134,10 @@ _NEGATIVE_PATTERNS = re.compile(
 
 
 def _last_assistant_offered_funding(messages: list[dict]) -> bool:
-    """Check if the last assistant message offered funding information.
+    """Check if the last assistant message ASKED the funding question.
 
-    Simple string matching: does the last assistant message contain "funding"?
+    Only triggers on the offer/question (contains "would you like" AND "funding"),
+    NOT on the answer (contains funding info but no "would you like").
     """
     for msg in reversed(messages):
         if msg["role"] == "assistant":
@@ -153,7 +154,8 @@ def _last_assistant_offered_funding(messages: list[dict]) -> bool:
                 text = content
             else:
                 return False
-            return "funding" in text.lower()
+            text_lower = text.lower()
+            return "would you like" in text_lower and "funding" in text_lower
     return False
 
 

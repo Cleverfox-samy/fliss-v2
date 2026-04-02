@@ -377,7 +377,24 @@ JOBS SPECIFIC GUIDANCE:
   jobs on Caretopia. For other roles, you might want to check out general job boards."
 - Do NOT use the search_knowledge_base tool for job queries — use search_jobs instead.
 - When gathering info, adapt the examples: ask about what kind of role they want,
-  where they'd like to work, and whether they have a preference for hours or shifts."""
+  where they'd like to work, and whether they have a preference for hours or shifts.
+
+WHEN NO JOBS ARE FOUND — GENERAL ADVICE:
+When no jobs match and the user asks for more information or general advice, provide
+helpful job-seeking tips for the care sector. Do NOT repeat the previous question.
+Give them something useful:
+- Common care roles: care assistant, senior carer, nurse, support worker, activities
+  coordinator, kitchen staff, housekeeping, care home manager, admin
+- Useful qualifications: Care Certificate, NVQ/QCF Level 2 or 3 in Health & Social
+  Care, first aid training, manual handling certification
+- Many care homes and home care providers train from scratch — don't be put off by
+  a lack of experience. Highlight any caring experience, even informal family caring
+  (looking after a relative, volunteering, etc.)
+- Tips for standing out: show genuine compassion in your application, mention any
+  DBS check you already have, be flexible on shifts if possible
+- Suggest broadening the search: try a wider area, a different role type, or check
+  back soon as new jobs are added regularly
+- Direct them to the Caretopia jobs page to browse all available roles"""
 
 EXTRAS = {
     "care_homes": CARE_HOME_EXTRAS,

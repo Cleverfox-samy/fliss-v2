@@ -169,6 +169,14 @@ def _user_declined_funding(message: str) -> bool:
 
 
 # Words that indicate "who" the care is for — relationship terms, self-references
+HEALTH_CONDITIONS = [
+    "dementia", "alzheimer", "mobility", "stroke", "parkinson",
+    "arthritis", "disability", "wheelchair", "frail", "blind", "deaf",
+    "autism", "adhd", "sen", "cancer", "diabetes", "incontinence",
+    "depression", "anxiety", "mental health", "learning difficult",
+]
+
+
 WHO_INDICATORS = [
     # Family relationships
     "mum", "mom", "mother", "dad", "father", "parent", "parents",
@@ -204,6 +212,18 @@ def _conversation_mentions_who(messages: list[dict]) -> bool:
             if indicator in text:
                 return True
     return False
+
+
+def _message_mentions_condition(message: str) -> bool:
+    """Check if the user's message mentions a health condition."""
+    text = message.lower()
+    return any(cond in text for cond in HEALTH_CONDITIONS)
+
+
+WELLBEING_CHECKIN = (
+    "\n\nAnd how are you doing? Looking for care can be stressful "
+    "— make sure you're looking after yourself too."
+)
 
 
 class ConversationEngine:
@@ -377,6 +397,38 @@ class ConversationEngine:
                 ]
                 answer = "\n".join(text_parts)
 
+                # --- RULE 1: Condition acknowledgement guard ---
+                # If the user mentioned a health condition but the AI
+                # skipped straight to the funding question, block the
+                # response and force the AI to acknowledge the condition
+                # first.
+                if (
+                    _message_mentions_condition(message)
+                    and "would you like" in answer.lower()
+                    and "funding" in answer.lower()
+                ):
+                    condition_nudge = (
+                        "[SYSTEM: The user just mentioned a health condition. "
+                        "You MUST first acknowledge their condition with 2-3 "
+                        "helpful sentences about what to look for in care for "
+                        "that condition. Do NOT ask about funding yet. Respond "
+                        "about their condition first, then in your NEXT message "
+                        "ask about funding.]"
+                    )
+                    # Strip search tools so AI focuses on the condition
+                    turn_tools = [
+                        t for t in self.tools
+                        if t["name"] == "search_knowledge_base"
+                    ]
+                    # Replace last assistant message with nothing (discard)
+                    messages.pop()
+                    # Re-inject the user message with the condition nudge
+                    messages[-1] = {
+                        "role": "user",
+                        "content": f"{condition_nudge}\n\n{current_content}",
+                    }
+                    continue  # Re-run the API call
+
                 # Auto-recovery: if AI wrote results-like text without calling
                 # the search tool, extract location and force a search so the
                 # frontend gets listing cards to display.
@@ -412,6 +464,10 @@ class ConversationEngine:
                             if geo:
                                 center_lat = geo["latitude"]
                                 center_lng = geo["longitude"]
+
+                # --- RULE 2: Wellbeing check-in after results ---
+                if search_performed:
+                    answer += WELLBEING_CHECKIN
 
                 # Determine intent (matching existing system's values)
                 if search_performed:

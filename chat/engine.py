@@ -155,7 +155,19 @@ def _last_assistant_offered_funding(messages: list[dict]) -> bool:
             else:
                 return False
             text_lower = text.lower()
-            return "would you like" in text_lower and "funding" in text_lower
+            has_offer = "would you like" in text_lower and "funding" in text_lower
+            # Don't match if this is the funding INFO response (contains
+            # actual funding details) — that means funding was already provided
+            # and we should NOT block the next turn.
+            has_funding_info = any(
+                term in text_lower
+                for term in [
+                    "local authority", "attendance allowance",
+                    "continuing healthcare", "self-fund",
+                    "deferred payment",
+                ]
+            )
+            return has_offer and not has_funding_info
     return False
 
 
@@ -287,19 +299,18 @@ class ConversationEngine:
         if awaiting_funding and not _user_declined_funding(message):
             # Strip search tools — only keep knowledge base tool
             turn_tools = [t for t in self.tools if t["name"] == "search_knowledge_base"]
-            # Inject a system-level nudge so the model knows what to do
+            # Inject nudge via system prompt — do NOT modify messages so the
+            # full conversation history (location, who, conditions) is preserved.
             funding_nudge = (
-                "[SYSTEM: The user has asked for funding information. You MUST "
+                "\n\n[SYSTEM: The user has asked for funding information. You MUST "
                 "provide funding details from the FUNDING INFORMATION section in "
                 "your instructions. Do NOT search for listings. Give them the "
                 "funding guidance first, then ask if they are ready to see care options.]"
             )
-            messages[-1] = {
-                "role": "user",
-                "content": f"{funding_nudge}\n\n{current_content}",
-            }
+            turn_system = self.system_prompt + funding_nudge
         else:
             turn_tools = self.tools
+            turn_system = self.system_prompt
 
         search_performed = False
         filters_used = None
@@ -312,7 +323,7 @@ class ConversationEngine:
             response = await self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                system=self.system_prompt,
+                system=turn_system,
                 tools=turn_tools,
                 messages=messages,
             )

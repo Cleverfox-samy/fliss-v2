@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import re
 from anthropic import AsyncAnthropic
 from config import get_settings
 from chat.prompts import get_system_prompt
@@ -123,6 +124,51 @@ def get_tools(frontend_type: str) -> list[dict]:
     return TOOLS_LISTINGS + [TOOL_KNOWLEDGE]
 
 
+# Affirmative responses that mean "yes, tell me about funding"
+_AFFIRMATIVE_PATTERNS = re.compile(
+    r"^\s*(yes|yeah|yep|yea|sure|please|ok|okay|go ahead|absolutely|definitely|"
+    r"that would be great|that\'d be great|i\'d like that|tell me more|"
+    r"yes please|please do|go on|i would|of course)\b",
+    re.IGNORECASE,
+)
+
+# Phrases in the assistant message that indicate a funding offer was made
+_FUNDING_OFFER_PHRASES = [
+    "funding options",
+    "before i show you some options",
+    "before i search",
+    "information about funding",
+    "would you like any information about funding",
+]
+
+
+def _last_assistant_offered_funding(messages: list[dict]) -> bool:
+    """Check if the last assistant message offered funding information."""
+    for msg in reversed(messages):
+        if msg["role"] == "assistant":
+            content = msg.get("content", "")
+            # Handle content that is a list of blocks (from API responses)
+            if isinstance(content, list):
+                text = " ".join(
+                    getattr(block, "text", "") if hasattr(block, "text")
+                    else block.get("text", "") if isinstance(block, dict)
+                    else ""
+                    for block in content
+                )
+            elif isinstance(content, str):
+                text = content
+            else:
+                return False
+            text_lower = text.lower()
+            return any(phrase in text_lower for phrase in _FUNDING_OFFER_PHRASES)
+    return False
+
+
+def _user_said_yes(message: str) -> bool:
+    """Check if the user's message is an affirmative response."""
+    return bool(_AFFIRMATIVE_PATTERNS.search(message.strip()))
+
+
 # Words that indicate "who" the care is for — relationship terms, self-references
 WHO_INDICATORS = [
     # Family relationships
@@ -226,6 +272,27 @@ class ConversationEngine:
             )
         messages.append({"role": "user", "content": current_content})
 
+        # --- Funding state tracker ---
+        # If the last assistant message offered funding info and the user
+        # said "yes", remove search tools so the AI *cannot* search and
+        # inject a system nudge to provide funding details instead.
+        awaiting_funding_response = _last_assistant_offered_funding(messages)
+        if awaiting_funding_response and _user_said_yes(message):
+            # Strip search tools — only keep knowledge base tool
+            turn_tools = [t for t in self.tools if t["name"] == "search_knowledge_base"]
+            # Inject a system-level nudge so the model knows what to do
+            funding_nudge = (
+                "[SYSTEM: The user asked for funding information. Provide the "
+                "funding details from your knowledge. Do NOT search for listings yet. "
+                "After giving funding info, ask if they are ready to see care options.]"
+            )
+            messages[-1] = {
+                "role": "user",
+                "content": f"{funding_nudge}\n\n{current_content}",
+            }
+        else:
+            turn_tools = self.tools
+
         search_performed = False
         filters_used = None
         listings_results = []
@@ -238,7 +305,7 @@ class ConversationEngine:
                 model=self.model,
                 max_tokens=4096,
                 system=self.system_prompt,
-                tools=self.tools,
+                tools=turn_tools,
                 messages=messages,
             )
 
@@ -298,6 +365,9 @@ class ConversationEngine:
                         })
 
                 messages.append({"role": "user", "content": tool_results})
+                # After processing tool results, restore full tools for
+                # any subsequent iterations (e.g. knowledge base follow-up)
+                turn_tools = self.tools
             else:
                 # Extract final text
                 text_parts = [
@@ -389,7 +459,6 @@ class ConversationEngine:
                 if filters and filters.get("location"):
                     return filters["location"]
         # Fall back to search context metadata injected into user messages
-        import re
         for msg in messages:
             if msg.get("role") != "user":
                 continue

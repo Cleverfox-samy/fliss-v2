@@ -124,26 +124,20 @@ def get_tools(frontend_type: str) -> list[dict]:
     return TOOLS_LISTINGS + [TOOL_KNOWLEDGE]
 
 
-# Affirmative responses that mean "yes, tell me about funding"
-_AFFIRMATIVE_PATTERNS = re.compile(
-    r"^\s*(yes|yeah|yep|yea|sure|please|ok|okay|go ahead|absolutely|definitely|"
-    r"that would be great|that\'d be great|i\'d like that|tell me more|"
-    r"yes please|please do|go on|i would|of course)\b",
+# Negative responses that clearly decline funding info
+_NEGATIVE_PATTERNS = re.compile(
+    r"^\s*(no|nah|nope|skip|no thanks|no thank you|just show|show me|"
+    r"don\'t need|not interested|not right now|maybe later|"
+    r"just search|just find|go ahead and search|search for)\b",
     re.IGNORECASE,
 )
 
-# Phrases in the assistant message that indicate a funding offer was made
-_FUNDING_OFFER_PHRASES = [
-    "funding options",
-    "before i show you some options",
-    "before i search",
-    "information about funding",
-    "would you like any information about funding",
-]
-
 
 def _last_assistant_offered_funding(messages: list[dict]) -> bool:
-    """Check if the last assistant message offered funding information."""
+    """Check if the last assistant message offered funding information.
+
+    Simple string matching: does the last assistant message contain "funding"?
+    """
     for msg in reversed(messages):
         if msg["role"] == "assistant":
             content = msg.get("content", "")
@@ -159,14 +153,17 @@ def _last_assistant_offered_funding(messages: list[dict]) -> bool:
                 text = content
             else:
                 return False
-            text_lower = text.lower()
-            return any(phrase in text_lower for phrase in _FUNDING_OFFER_PHRASES)
+            return "funding" in text.lower()
     return False
 
 
-def _user_said_yes(message: str) -> bool:
-    """Check if the user's message is an affirmative response."""
-    return bool(_AFFIRMATIVE_PATTERNS.search(message.strip()))
+def _user_declined_funding(message: str) -> bool:
+    """Check if the user explicitly declined funding info.
+
+    Default assumption: if the user didn't clearly say no, treat it as yes.
+    This is the inverse approach — block search unless user clearly declines.
+    """
+    return bool(_NEGATIVE_PATTERNS.search(message.strip()))
 
 
 # Words that indicate "who" the care is for — relationship terms, self-references
@@ -272,19 +269,22 @@ class ConversationEngine:
             )
         messages.append({"role": "user", "content": current_content})
 
-        # --- Funding state tracker ---
-        # If the last assistant message offered funding info and the user
-        # said "yes", remove search tools so the AI *cannot* search and
-        # inject a system nudge to provide funding details instead.
-        awaiting_funding_response = _last_assistant_offered_funding(messages)
-        if awaiting_funding_response and _user_said_yes(message):
+        # --- Funding state tracker (hard block) ---
+        # If the last assistant message mentioned "funding" and the user
+        # did NOT clearly decline, remove search tools so the AI physically
+        # cannot search. Any response that isn't an explicit "no/skip" is
+        # treated as wanting funding info. This is intentionally aggressive
+        # because the AI was ignoring prompt-level instructions ~50% of the time.
+        awaiting_funding = _last_assistant_offered_funding(messages)
+        if awaiting_funding and not _user_declined_funding(message):
             # Strip search tools — only keep knowledge base tool
             turn_tools = [t for t in self.tools if t["name"] == "search_knowledge_base"]
             # Inject a system-level nudge so the model knows what to do
             funding_nudge = (
-                "[SYSTEM: The user asked for funding information. Provide the "
-                "funding details from your knowledge. Do NOT search for listings yet. "
-                "After giving funding info, ask if they are ready to see care options.]"
+                "[SYSTEM: The user has asked for funding information. You MUST "
+                "provide funding details from the FUNDING INFORMATION section in "
+                "your instructions. Do NOT search for listings. Give them the "
+                "funding guidance first, then ask if they are ready to see care options.]"
             )
             messages[-1] = {
                 "role": "user",

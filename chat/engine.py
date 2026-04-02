@@ -305,6 +305,42 @@ class ConversationEngine:
                 ]
                 answer = "\n".join(text_parts)
 
+                # Auto-recovery: if AI wrote results-like text without calling
+                # the search tool, extract location and force a search so the
+                # frontend gets listing cards to display.
+                if not search_performed and any(
+                    phrase in answer.lower()
+                    for phrase in [
+                        "take a look at the options",
+                        "here are some",
+                        "i've found some",
+                        "i found some",
+                        "check out the options",
+                        "options below",
+                    ]
+                ):
+                    location = self._extract_location_from_history(messages)
+                    if location:
+                        import logging
+                        logging.warning(
+                            f"[Fliss] AI wrote results text without calling search tool. "
+                            f"Auto-recovering with location={location}, type={self.frontend_type}"
+                        )
+                        keywords = self._extract_keywords_from_history(messages)
+                        tool_input = {"location": location, "keywords": keywords, "limit": 8}
+                        result_json, raw_results, geo = await self._handle_search(tool_input)
+                        if raw_results:
+                            search_performed = True
+                            listings_results = raw_results
+                            filters_used = {
+                                "location": location,
+                                "keywords": keywords,
+                                "radius_km": 25,
+                            }
+                            if geo:
+                                center_lat = geo["latitude"]
+                                center_lng = geo["longitude"]
+
                 # Determine intent (matching existing system's values)
                 if search_performed:
                     intent = "listings"
@@ -339,6 +375,41 @@ class ConversationEngine:
                     "center_lng": center_lng,
                     "filters_used": filters_used,
                 }
+
+    def _extract_location_from_history(self, messages: list[dict]) -> str | None:
+        """Extract the most recent location from conversation history.
+
+        Checks filters_used from previous searches first, then falls back
+        to the search context injected into user messages.
+        """
+        # Check if a previous search had a location in filters_used
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                filters = msg.get("filters_used")
+                if filters and filters.get("location"):
+                    return filters["location"]
+        # Fall back to search context metadata injected into user messages
+        import re
+        for msg in messages:
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content", "")
+            if not isinstance(content, str):
+                continue
+            # Look for location in search context
+            match = re.search(r'"location":\s*"([^"]+)"', content)
+            if match:
+                return match.group(1)
+        return None
+
+    def _extract_keywords_from_history(self, messages: list[dict]) -> list[str]:
+        """Extract keywords from conversation history."""
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                filters = msg.get("filters_used")
+                if filters and filters.get("keywords"):
+                    return filters["keywords"]
+        return []
 
     async def _handle_search(self, tool_input: dict) -> tuple:
         """Execute search_listings with location-first fallback.

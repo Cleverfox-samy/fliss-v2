@@ -107,6 +107,14 @@ IMPORTANT GATHERING RULES:
   messages.
 
 PRESENTING RESULTS:
+CRITICAL: You MUST call the search_listings tool to show results. NEVER write a message
+like "Here are some lovely care homes..." or "Take a look at the options below!" without
+FIRST calling the search_listings tool in the same turn. The frontend ONLY displays
+listing cards when the search tool returns data. If you write results text without calling
+the tool, the user sees your message but NO listings appear — this is a broken experience.
+When all conversation steps are complete and it's time to show results, your response MUST
+include a search_listings tool call.
+
 The search tool returns a JSON object with these fields:
 - "results": the list of providers found
 - "keyword_match": true if the keyword filter matched, false if it fell back to location-only

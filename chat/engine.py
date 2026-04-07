@@ -218,10 +218,65 @@ def _conversation_mentions_who(messages: list[dict]) -> bool:
     return False
 
 
-WELLBEING_CHECKIN = (
-    "\n\nAnd how are you doing? Looking for care can be stressful "
-    "— make sure you're looking after yourself too."
+WELLBEING_CHECKIN_QUESTION = (
+    "I've found some lovely options for you — I'll show them to you in just a "
+    "moment. But first, how are you doing? Looking for care can be a lot to carry."
 )
+
+WELLBEING_ACKNOWLEDGMENT = (
+    "Thank you for sharing — that means a lot. Here are the options I found for you:"
+)
+
+_WELLBEING_PHRASES = (
+    "how are you doing",
+    "looking after yourself",
+    "how are you holding up",
+)
+
+
+def _assistant_text(msg: dict) -> str:
+    """Extract plain text from an assistant message's content (str or block list)."""
+    content = msg.get("content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(
+            getattr(block, "text", "") if hasattr(block, "text")
+            else block.get("text", "") if isinstance(block, dict)
+            else ""
+            for block in content
+        )
+    return ""
+
+
+def _wellbeing_checkin_done(messages: list[dict]) -> bool:
+    """True if any assistant message in history contains a wellbeing check-in phrase."""
+    for msg in messages:
+        if msg.get("role") != "assistant":
+            continue
+        text = _assistant_text(msg).lower()
+        if any(phrase in text for phrase in _WELLBEING_PHRASES):
+            return True
+    return False
+
+
+def _wellbeing_checkin_offered(messages: list[dict]) -> bool:
+    """True if the wellbeing check-in question has been asked at any point."""
+    for msg in messages:
+        if msg.get("role") != "assistant":
+            continue
+        text = _assistant_text(msg).lower()
+        if any(phrase in text for phrase in _WELLBEING_PHRASES):
+            return True
+    return False
+
+
+def _get_pending_results(conversation_history: list[dict]) -> dict | None:
+    """Return pending_results stored on the most recent assistant message, if any."""
+    for msg in reversed(conversation_history):
+        if msg.get("role") == "assistant":
+            return msg.get("pending_results")
+    return None
 
 
 class ConversationEngine:
@@ -258,6 +313,24 @@ class ConversationEngine:
                 "center_lng": float | None,
             }
         """
+        # --- Pending results short-circuit ---
+        # If the previous turn deferred results to ask a wellbeing check-in,
+        # the most recent assistant message will carry pending_results metadata.
+        # The user has now responded to the wellbeing question — return the
+        # stored results immediately without calling the model again.
+        pending = _get_pending_results(conversation_history)
+        if pending:
+            return {
+                "intent": "listings",
+                "confidence": 1.0,
+                "answer": WELLBEING_ACKNOWLEDGMENT,
+                "results": pending.get("results", []),
+                "title": pending.get("title", ""),
+                "center_lat": pending.get("center_lat"),
+                "center_lng": pending.get("center_lng"),
+                "filters_used": pending.get("filters_used"),
+            }
+
         # Build messages for the API, injecting search context from
         # previous turns into user messages (not assistant messages) so the
         # model has cumulative criteria but never echoes the metadata.
@@ -430,10 +503,6 @@ class ConversationEngine:
                                 center_lat = geo["latitude"]
                                 center_lng = geo["longitude"]
 
-                # --- RULE 2: Wellbeing check-in after results ---
-                if search_performed:
-                    answer += WELLBEING_CHECKIN
-
                 # Determine intent (matching existing system's values)
                 if search_performed:
                     intent = "listings"
@@ -457,6 +526,34 @@ class ConversationEngine:
                         title = f"Results near {location}" if location else "Search results"
                 else:
                     title = ""
+
+                # --- RULE 2: Wellbeing check-in before first results ---
+                # If we've just performed a search and the wellbeing check-in
+                # has never been offered in this conversation, defer the results
+                # by one turn: ask the wellbeing question now, stash the results
+                # as pending_results, and let the next turn return them.
+                if (
+                    search_performed
+                    and not _wellbeing_checkin_done(messages[:-1])
+                    and not _wellbeing_checkin_offered(messages[:-1])
+                ):
+                    return {
+                        "intent": "clarify",
+                        "confidence": 1.0,
+                        "answer": WELLBEING_CHECKIN_QUESTION,
+                        "results": [],
+                        "title": "",
+                        "center_lat": None,
+                        "center_lng": None,
+                        "filters_used": None,
+                        "pending_results": {
+                            "results": listings_results,
+                            "title": title,
+                            "center_lat": center_lat,
+                            "center_lng": center_lng,
+                            "filters_used": filters_used,
+                        },
+                    }
 
                 return {
                     "intent": intent,

@@ -88,6 +88,9 @@ async def query(req: QueryRequest):
         assistant_msg["title"] = result.get("title", "")
         assistant_msg["center_lat"] = result.get("center_lat")
         assistant_msg["center_lng"] = result.get("center_lng")
+    # Persist deferred results across the wellbeing check-in turn
+    if result.get("pending_results"):
+        assistant_msg["pending_results"] = result["pending_results"]
     history.append(assistant_msg)
 
     return QueryResponse(**result)

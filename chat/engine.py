@@ -233,6 +233,26 @@ _WELLBEING_PHRASES = (
     "how are you holding up",
 )
 
+_NEGATIVE_WELLBEING_WORDS = [
+    "not great", "not good", "not well", "struggling", "stressed",
+    "worried", "terrible", "awful", "bad", "difficult", "hard time",
+    "overwhelmed", "not doing well", "not coping", "anxious",
+    "depressed", "lonely", "scared",
+]
+
+WELLBEING_SUPPORT_MESSAGE = (
+    "I'm really sorry to hear that. Please know you're not alone — "
+    "Carers UK (carersuk.org, 0808 808 7777) and Age UK (ageuk.org.uk, "
+    "0800 678 1602) both have advisers who can talk things through with "
+    "you. Your GP can also help if things feel overwhelming.\n\n"
+)
+
+
+def _wellbeing_response_is_negative(user_message: str) -> bool:
+    """Check if the user's response to the wellbeing check-in contains negative sentiment."""
+    text = user_message.lower()
+    return any(word in text for word in _NEGATIVE_WELLBEING_WORDS)
+
 
 def _assistant_text(msg: dict) -> str:
     """Extract plain text from an assistant message's content (str or block list)."""
@@ -320,10 +340,14 @@ class ConversationEngine:
         # stored results immediately without calling the model again.
         pending = _get_pending_results(conversation_history)
         if pending:
+            if _wellbeing_response_is_negative(message):
+                answer = WELLBEING_SUPPORT_MESSAGE + WELLBEING_ACKNOWLEDGMENT
+            else:
+                answer = WELLBEING_ACKNOWLEDGMENT
             return {
                 "intent": "listings",
                 "confidence": 1.0,
-                "answer": WELLBEING_ACKNOWLEDGMENT,
+                "answer": answer,
                 "results": pending.get("results", []),
                 "title": pending.get("title", ""),
                 "center_lat": pending.get("center_lat"),

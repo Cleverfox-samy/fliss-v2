@@ -227,12 +227,6 @@ WELLBEING_ACKNOWLEDGMENT = (
     "Thank you for sharing — that means a lot. Here are the options I found for you:"
 )
 
-_WELLBEING_PHRASES = (
-    "how are you doing",
-    "looking after yourself",
-    "how are you holding up",
-)
-
 _NEGATIVE_WELLBEING_WORDS = [
     "not great", "not good", "not well", "struggling", "stressed",
     "worried", "terrible", "awful", "bad", "difficult", "hard time",
@@ -270,23 +264,25 @@ def _assistant_text(msg: dict) -> str:
 
 
 def _wellbeing_checkin_done(messages: list[dict]) -> bool:
-    """True if any assistant message in history contains a wellbeing check-in phrase."""
+    """True if any assistant message in history contains the exact wellbeing check-in question."""
+    target = WELLBEING_CHECKIN_QUESTION.lower()
     for msg in messages:
         if msg.get("role") != "assistant":
             continue
         text = _assistant_text(msg).lower()
-        if any(phrase in text for phrase in _WELLBEING_PHRASES):
+        if target in text:
             return True
     return False
 
 
 def _wellbeing_checkin_offered(messages: list[dict]) -> bool:
-    """True if the wellbeing check-in question has been asked at any point."""
+    """True if the exact wellbeing check-in question has been asked at any point."""
+    target = WELLBEING_CHECKIN_QUESTION.lower()
     for msg in messages:
         if msg.get("role") != "assistant":
             continue
         text = _assistant_text(msg).lower()
-        if any(phrase in text for phrase in _WELLBEING_PHRASES):
+        if target in text:
             return True
     return False
 

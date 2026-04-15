@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from chat.engine import ConversationEngine
+from chat.persistence import save_conversation
 from tools.search import close_pool
 
 
@@ -92,6 +93,20 @@ async def query(req: QueryRequest):
     if result.get("pending_results"):
         assistant_msg["pending_results"] = result["pending_results"]
     history.append(assistant_msg)
+
+    # Fire-and-forget persistence of the full conversation for analysis.
+    location = None
+    for m in reversed(history):
+        f = m.get("filters_used") if isinstance(m, dict) else None
+        if f and f.get("location"):
+            location = f["location"]
+            break
+    save_conversation(
+        session_id=session_id,
+        user_type=page_type,
+        location=location,
+        messages=history,
+    )
 
     return QueryResponse(**result)
 

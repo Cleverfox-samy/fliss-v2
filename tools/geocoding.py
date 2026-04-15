@@ -42,19 +42,31 @@ UK_LOCATIONS = {
     "crawley": {"latitude": 51.1092, "longitude": -0.1872, "formatted_address": "Crawley, West Sussex, UK"},
     "sussex": {"latitude": 50.8825, "longitude": -0.2764, "formatted_address": "Sussex, UK"},
     "essex": {"latitude": 51.7343, "longitude": 0.4691, "formatted_address": "Essex, UK"},
+    "chichester": {"latitude": 50.8376, "longitude": -0.7749, "formatted_address": "Chichester, West Sussex, UK"},
+    "henfield": {"latitude": 50.9310, "longitude": -0.2760, "formatted_address": "Henfield, West Sussex, UK"},
+    "steyning": {"latitude": 50.8869, "longitude": -0.3267, "formatted_address": "Steyning, West Sussex, UK"},
+    "horsham": {"latitude": 51.0629, "longitude": -0.3277, "formatted_address": "Horsham, West Sussex, UK"},
+    "hastings": {"latitude": 50.8543, "longitude": 0.5733, "formatted_address": "Hastings, East Sussex, UK"},
+    "guildford": {"latitude": 51.2362, "longitude": -0.5704, "formatted_address": "Guildford, Surrey, UK"},
+    "chester": {"latitude": 53.1910, "longitude": -2.8909, "formatted_address": "Chester, Cheshire, UK"},
+    "lincoln": {"latitude": 53.2307, "longitude": -0.5406, "formatted_address": "Lincoln, Lincolnshire, UK"},
+    "ipswich": {"latitude": 52.0567, "longitude": 1.1482, "formatted_address": "Ipswich, Suffolk, UK"},
+    "colchester": {"latitude": 51.8959, "longitude": 0.8919, "formatted_address": "Colchester, Essex, UK"},
+    "canterbury": {"latitude": 51.2802, "longitude": 1.0789, "formatted_address": "Canterbury, Kent, UK"},
+    "dover": {"latitude": 51.1279, "longitude": 1.3134, "formatted_address": "Dover, Kent, UK"},
+    "tunbridge wells": {"latitude": 51.1324, "longitude": 0.2637, "formatted_address": "Tunbridge Wells, Kent, UK"},
+    "maidstone": {"latitude": 51.2720, "longitude": 0.5292, "formatted_address": "Maidstone, Kent, UK"},
 }
 
 
 def _lookup_cached(location: str) -> dict | None:
-    """Check the fast UK locations cache."""
+    """Check the fast UK locations cache (exact or pre-comma match only)."""
     key = location.lower().strip()
-    # Exact match first
     if key in UK_LOCATIONS:
         return UK_LOCATIONS[key]
-    # Partial match
-    for name, coords in UK_LOCATIONS.items():
-        if name in key or key in name:
-            return coords
+    head = key.split(",")[0].strip()
+    if head and head in UK_LOCATIONS:
+        return UK_LOCATIONS[head]
     return None
 
 

@@ -227,12 +227,34 @@ WELLBEING_ACKNOWLEDGMENT = (
     "Thank you for sharing — that means a lot. Here are the options I found for you:"
 )
 
-_NEGATIVE_WELLBEING_WORDS = [
-    "not great", "not good", "not well", "struggling", "stressed",
-    "worried", "terrible", "awful", "bad", "difficult", "hard time",
-    "overwhelmed", "not doing well", "not coping", "anxious",
-    "depressed", "lonely", "scared",
-]
+_NEGATIVE_WELLBEING_WORDS = {
+    "struggling", "stressed", "worried", "terrible", "awful", "bad",
+    "difficult", "overwhelmed", "anxious", "depressed", "lonely",
+    "scared", "unwell", "rubbish", "exhausted", "drained", "shattered",
+    "miserable", "hopeless", "helpless", "upset", "crying", "sad",
+    "horrible", "rough", "crap", "crappy", "knackered",
+}
+
+_POSITIVE_WELLBEING_WORDS = {
+    "well", "good", "great", "ok", "okay", "fine", "alright",
+    "coping", "happy", "grand", "brilliant",
+}
+
+# Matches "not", "n't", "no", common typos ("nto", "nt"), and negated auxiliaries.
+_NEGATION_PATTERN = re.compile(
+    r"\b(not|no|nto|nt|nope|nah|never|ain'?t|aint|don'?t|dont|"
+    r"can'?t|cant|isn'?t|isnt|wasn'?t|wasnt|couldn'?t|couldnt|"
+    r"wouldn'?t|wouldnt|hardly|barely)\b"
+)
+_NEGATIVE_WORD_PATTERN = re.compile(
+    r"\b(" + "|".join(_NEGATIVE_WELLBEING_WORDS) + r")\b"
+)
+_POSITIVE_WORD_PATTERN = re.compile(
+    r"\b(" + "|".join(_POSITIVE_WELLBEING_WORDS) + r")\b"
+)
+_HARD_TIME_PATTERN = re.compile(
+    r"\b(hard|tough|rough)\s+(time|day|days|week|month|patch|going|spell)\b"
+)
 
 WELLBEING_SUPPORT_MESSAGE = (
     "I'm really sorry to hear that. Please know you're not alone — "
@@ -245,7 +267,15 @@ WELLBEING_SUPPORT_MESSAGE = (
 def _wellbeing_response_is_negative(user_message: str) -> bool:
     """Check if the user's response to the wellbeing check-in contains negative sentiment."""
     text = user_message.lower()
-    return any(word in text for word in _NEGATIVE_WELLBEING_WORDS)
+    if _NEGATIVE_WORD_PATTERN.search(text):
+        return True
+    if _HARD_TIME_PATTERN.search(text):
+        return True
+    # Negation + positive word catches "not well", "nto doing well",
+    # "not great", "not coping", "isn't ok", etc. — robust to typos.
+    if _NEGATION_PATTERN.search(text) and _POSITIVE_WORD_PATTERN.search(text):
+        return True
+    return False
 
 
 def _assistant_text(msg: dict) -> str:

@@ -256,12 +256,26 @@ _HARD_TIME_PATTERN = re.compile(
     r"\b(hard|tough|rough)\s+(time|day|days|week|month|patch|going|spell)\b"
 )
 
-WELLBEING_SUPPORT_MESSAGE = (
+_WELLBEING_SUPPORT_CARER = (
     "I'm really sorry to hear that. Please know you're not alone — "
     "Carers UK (carersuk.org, 0808 808 7777) and Age UK (ageuk.org.uk, "
     "0800 678 1602) both have advisers who can talk things through with "
     "you. Your GP can also help if things feel overwhelming.\n\n"
 )
+
+_WELLBEING_SUPPORT_PARENT = (
+    "I'm really sorry to hear that. Please know you're not alone — "
+    "Family Lives (familylives.org.uk, 0808 800 2222) and Home-Start "
+    "(home-start.org.uk, 0116 464 5490) both have people who can talk "
+    "things through with you. Your health visitor or GP can also help "
+    "if things feel overwhelming.\n\n"
+)
+
+
+def _wellbeing_support_message(frontend_type: str) -> str:
+    if (frontend_type or "").upper() == "NURSERY":
+        return _WELLBEING_SUPPORT_PARENT
+    return _WELLBEING_SUPPORT_CARER
 
 
 def _wellbeing_response_is_negative(user_message: str) -> bool:
@@ -367,7 +381,7 @@ class ConversationEngine:
         pending = _get_pending_results(conversation_history)
         if pending:
             if _wellbeing_response_is_negative(message):
-                answer = WELLBEING_SUPPORT_MESSAGE + WELLBEING_ACKNOWLEDGMENT
+                answer = _wellbeing_support_message(self.frontend_type) + WELLBEING_ACKNOWLEDGMENT
             else:
                 answer = WELLBEING_ACKNOWLEDGMENT
             return {

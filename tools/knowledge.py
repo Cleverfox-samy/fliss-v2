@@ -492,6 +492,33 @@ TEST_KNOWLEDGE = [
 ]
 
 
+_CARER_TO_PARENT_REPLACEMENTS = {
+    "Carers UK (0808 808 7777, carersuk.org)": (
+        "Family Lives (0808 800 2222, familylives.org.uk) and "
+        "Home-Start (0116 464 5490, home-start.org.uk)"
+    ),
+    "Carers UK (0808 808 7777)": "Family Lives (0808 800 2222)",
+    "Carers UK (carersuk.org)": "Family Lives (familylives.org.uk)",
+    "Carers UK": "Family Lives",
+    "Age UK (0800 678 1602)": "Family Lives (0808 800 2222)",
+    "Age UK (ageuk.org.uk)": "Family Lives (familylives.org.uk)",
+    "Age UK": "Family Lives",
+}
+
+
+def _localise_for_page_type(items: list[dict], page_type: str) -> list[dict]:
+    """Swap carer-focused charity references for parent-focused ones on nursery pages."""
+    if page_type != "nurseries":
+        return items
+    out = []
+    for item in items:
+        text = item.get("text", "")
+        for src, dst in _CARER_TO_PARENT_REPLACEMENTS.items():
+            text = text.replace(src, dst)
+        out.append({**item, "text": text})
+    return out
+
+
 def _search_test_knowledge(query: str, top_k: int = 5) -> list[dict]:
     """Keyword matching with ID boosting against test knowledge base."""
     query_lower = query.lower()
@@ -523,6 +550,7 @@ def _search_test_knowledge(query: str, top_k: int = 5) -> list[dict]:
 async def search_knowledge_base(
     query: str,
     top_k: int = 5,
+    page_type: str = "",
 ) -> list[dict]:
     """Search knowledge base.
 
@@ -531,4 +559,5 @@ async def search_knowledge_base(
     The Pinecone index 'caretopia-docs' has 84 vectors at 384 dimensions —
     likely all-MiniLM-L6-v2 or similar. Need to confirm before querying.
     """
-    return _search_test_knowledge(query, top_k)
+    results = _search_test_knowledge(query, top_k)
+    return _localise_for_page_type(results, page_type)

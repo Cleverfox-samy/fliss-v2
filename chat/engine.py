@@ -349,7 +349,9 @@ class ConversationEngine:
         self.client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         self.model = settings.fliss_model
         self.frontend_type = frontend_type
+        print(f"[DEBUG] frontend_type={self.frontend_type}")
         page_type = FRONTEND_TYPE_TO_PAGE.get(frontend_type, "care_homes")
+        self.page_type = page_type
         self.system_prompt = get_system_prompt(page_type)
         self.tools = get_tools(frontend_type)
 
@@ -509,7 +511,10 @@ class ConversationEngine:
                                 center_lat = geo["latitude"]
                                 center_lng = geo["longitude"]
                         elif block.name == "search_knowledge_base":
-                            results = await search_knowledge_base(query=block.input["query"])
+                            results = await search_knowledge_base(
+                                query=block.input["query"],
+                                page_type=self.page_type,
+                            )
                             result_json = json.dumps(results, default=str)
                         else:
                             result_json = json.dumps({"error": f"Unknown tool: {block.name}"})

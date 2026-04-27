@@ -190,11 +190,7 @@ use the knowledge base tool.
 DEEP DIVE OPTION: After giving any informational response (funding, dementia, conditions,
 carer support, etc.), ALWAYS offer: "Would you like me to go into more detail?" and
 include links to relevant UK organisations and charities. Use these links based on topic:
-- Dementia: Dementia UK (dementiauk.org), Alzheimer's Society (alzheimers.org.uk)
-- Funding: gov.uk/care-funding, Age UK (ageuk.org.uk)
-- Carers: Carers UK (carersuk.org)
-- Children/ADHD: IPSEA (ipsea.org.uk), Contact (contact.org.uk)
-- General: Citizens Advice (citizensadvice.org.uk)
+{support_links}
 
 ORGANISATION LINKS: Whenever you provide informational content, you MUST include
 relevant UK organisation links from the list above. Weave them naturally into your
@@ -316,7 +312,7 @@ The key funding options are:
    local authority may let you defer payment so you don't have to sell immediately.
 
 Always recommend starting with a free Care Needs Assessment from their local council as
-a first step. Include links to gov.uk/care-funding and Age UK (ageuk.org.uk).
+a first step. Include links to {funding_closer_links}.
 After giving funding info, ask ONE clear question: "Shall I show you some care home options now?"
 Do NOT ask two questions in one message (e.g. don't say "Would you like more detail OR are you ready to see options?").
 
@@ -421,13 +417,38 @@ EXTRAS = {
 }
 
 
+_SUPPORT_LINKS_CARER = """- Dementia: Dementia UK (dementiauk.org), Alzheimer's Society (alzheimers.org.uk)
+- Funding: gov.uk/care-funding, Age UK (ageuk.org.uk)
+- Carers: Carers UK (carersuk.org)
+- Children/ADHD: IPSEA (ipsea.org.uk), Contact (contact.org.uk)
+- General: Citizens Advice (citizensadvice.org.uk)"""
+
+_SUPPORT_LINKS_PARENT = """- Parent support: Family Lives (familylives.org.uk, 0808 800 2222), Home-Start (home-start.org.uk, 0116 464 5490)
+- Children/ADHD/SEND: IPSEA (ipsea.org.uk), Contact (contact.org.uk)
+- General: Citizens Advice (citizensadvice.org.uk)"""
+
+_FUNDING_CLOSER_CARER = "gov.uk/care-funding and Age UK (ageuk.org.uk)"
+_FUNDING_CLOSER_PARENT = (
+    "Family Lives (familylives.org.uk, 0808 800 2222) and "
+    "Home-Start (home-start.org.uk, 0116 464 5490)"
+)
+
+
 def get_system_prompt(page_type: str) -> str:
     label = PAGE_TYPE_LABELS.get(page_type, page_type)
     single = PAGE_TYPE_SINGLES.get(page_type, page_type)
+    if page_type == "nurseries":
+        support_links = _SUPPORT_LINKS_PARENT
+        funding_closer_links = _FUNDING_CLOSER_PARENT
+    else:
+        support_links = _SUPPORT_LINKS_CARER
+        funding_closer_links = _FUNDING_CLOSER_CARER
     prompt = SYSTEM_PROMPT_TEMPLATE.format(
         page_type=page_type,
         page_type_label=label,
         page_type_single=single,
+        support_links=support_links,
+        funding_closer_links=funding_closer_links,
     )
     prompt += EXTRAS.get(page_type, "")
     return prompt

@@ -420,7 +420,31 @@ class ConversationEngine:
         print(f"[WB-DIAG] last_assistant_extracted_text={_last_asst_text!r}", flush=True)
         print(f"[WB-DIAG] _last_assistant_asked_wellbeing={_detected_wellbeing}", flush=True)
         print(f"[WB-DIAG] _wellbeing_response_is_negative={_detected_negative}", flush=True)
+        _checkin_done = _wellbeing_checkin_done(conversation_history)
+        print(f"[WB-DIAG] _wellbeing_checkin_done={_checkin_done}", flush=True)
         # --- END DIAGNOSTIC LOGGING ---
+
+        # --- Distress short-circuit ---
+        # If the user's current message expresses negative wellbeing AND the
+        # verbatim wellbeing check-in has never been delivered, the LLM is
+        # about to freelance an empathic reply with markdown links that the
+        # frontend truncates. Pre-empt it with the hardcoded support message
+        # + acknowledgment. The LLM never sees this turn.
+        if _detected_negative and not _checkin_done:
+            pending = _get_pending_results(conversation_history) or {}
+            answer = _wellbeing_support_message(self.frontend_type) + WELLBEING_ACKNOWLEDGMENT
+            print(f"[WB-DIAG] distress_short_circuit=TAKEN answer_first200={answer[:200]!r}", flush=True)
+            return {
+                "intent": "listings" if pending else "clarify",
+                "confidence": 1.0,
+                "answer": answer,
+                "results": pending.get("results", []),
+                "title": pending.get("title", ""),
+                "center_lat": pending.get("center_lat"),
+                "center_lng": pending.get("center_lng"),
+                "filters_used": pending.get("filters_used"),
+            }
+
         if _last_assistant_asked_wellbeing(conversation_history):
             if _wellbeing_response_is_negative(message):
                 answer = _wellbeing_support_message(self.frontend_type) + WELLBEING_ACKNOWLEDGMENT

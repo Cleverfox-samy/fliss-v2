@@ -339,6 +339,15 @@ def _get_pending_results(conversation_history: list[dict]) -> dict | None:
     return None
 
 
+def _last_assistant_asked_wellbeing(messages: list[dict]) -> bool:
+    """True if the most recent assistant message asked the wellbeing check-in."""
+    target = WELLBEING_CHECKIN_QUESTION.lower()
+    for msg in reversed(messages):
+        if msg.get("role") == "assistant":
+            return target in _assistant_text(msg).lower()
+    return False
+
+
 class ConversationEngine:
     def __init__(self, frontend_type: str):
         """
@@ -375,17 +384,19 @@ class ConversationEngine:
                 "center_lng": float | None,
             }
         """
-        # --- Pending results short-circuit ---
-        # If the previous turn deferred results to ask a wellbeing check-in,
-        # the most recent assistant message will carry pending_results metadata.
-        # The user has now responded to the wellbeing question — return the
-        # stored results immediately without calling the model again.
-        pending = _get_pending_results(conversation_history)
-        if pending:
+        # --- Wellbeing support short-circuit (robust) ---
+        # Trigger off the visible transcript, not pending_results metadata,
+        # which does not survive all session storage paths. If the previous
+        # assistant turn asked the wellbeing check-in, the user's reply is
+        # answering it — return the hardcoded support message verbatim. The
+        # LLM must NEVER compose this reply: it produces markdown link syntax
+        # that the frontend truncates and sometimes drops the support orgs.
+        if _last_assistant_asked_wellbeing(conversation_history):
             if _wellbeing_response_is_negative(message):
                 answer = _wellbeing_support_message(self.frontend_type) + WELLBEING_ACKNOWLEDGMENT
             else:
                 answer = WELLBEING_ACKNOWLEDGMENT
+            pending = _get_pending_results(conversation_history) or {}
             return {
                 "intent": "listings",
                 "confidence": 1.0,

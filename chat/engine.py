@@ -404,12 +404,30 @@ class ConversationEngine:
         # answering it — return the hardcoded support message verbatim. The
         # LLM must NEVER compose this reply: it produces markdown link syntax
         # that the frontend truncates and sometimes drops the support orgs.
+        # --- DIAGNOSTIC LOGGING (temporary) ---
+        _last_asst_msg = None
+        for _m in reversed(conversation_history):
+            if _m.get("role") == "assistant":
+                _last_asst_msg = _m
+                break
+        _last_asst_raw = _last_asst_msg.get("content") if _last_asst_msg else None
+        _last_asst_text = _assistant_text(_last_asst_msg) if _last_asst_msg else ""
+        _detected_wellbeing = _last_assistant_asked_wellbeing(conversation_history)
+        _detected_negative = _wellbeing_response_is_negative(message)
+        print(f"[WB-DIAG] user_message={message!r}", flush=True)
+        print(f"[WB-DIAG] last_assistant_content_type={type(_last_asst_raw).__name__}", flush=True)
+        print(f"[WB-DIAG] last_assistant_raw={_last_asst_raw!r}", flush=True)
+        print(f"[WB-DIAG] last_assistant_extracted_text={_last_asst_text!r}", flush=True)
+        print(f"[WB-DIAG] _last_assistant_asked_wellbeing={_detected_wellbeing}", flush=True)
+        print(f"[WB-DIAG] _wellbeing_response_is_negative={_detected_negative}", flush=True)
+        # --- END DIAGNOSTIC LOGGING ---
         if _last_assistant_asked_wellbeing(conversation_history):
             if _wellbeing_response_is_negative(message):
                 answer = _wellbeing_support_message(self.frontend_type) + WELLBEING_ACKNOWLEDGMENT
             else:
                 answer = WELLBEING_ACKNOWLEDGMENT
             pending = _get_pending_results(conversation_history) or {}
+            print(f"[WB-DIAG] short_circuit=TAKEN answer_first200={answer[:200]!r}", flush=True)
             return {
                 "intent": "listings",
                 "confidence": 1.0,
@@ -420,6 +438,7 @@ class ConversationEngine:
                 "center_lng": pending.get("center_lng"),
                 "filters_used": pending.get("filters_used"),
             }
+        print(f"[WB-DIAG] short_circuit=NOT_TAKEN — FALLING THROUGH TO LLM", flush=True)
 
         # Build messages for the API, injecting search context from
         # previous turns into user messages (not assistant messages) so the
@@ -648,6 +667,7 @@ class ConversationEngine:
                         },
                     }
 
+                print(f"[WB-DIAG] final_return answer_first200={answer[:200]!r} intent={intent}", flush=True)
                 return {
                     "intent": intent,
                     "confidence": confidence,

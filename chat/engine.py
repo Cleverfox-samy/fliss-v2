@@ -339,12 +339,25 @@ def _get_pending_results(conversation_history: list[dict]) -> dict | None:
     return None
 
 
+_WELLBEING_QUESTION_PATTERN = re.compile(
+    r"how\s+(are\s+you|are\s+things|have\s+you\s+been|"
+    r"are\s+you\s+(doing|feeling|holding\s+up|coping|getting\s+on))",
+    re.IGNORECASE,
+)
+
+
 def _last_assistant_asked_wellbeing(messages: list[dict]) -> bool:
-    """True if the most recent assistant message asked the wellbeing check-in."""
-    target = WELLBEING_CHECKIN_QUESTION.lower()
+    """True if the most recent assistant message asked a wellbeing-style question.
+
+    Matches the hardcoded WELLBEING_CHECKIN_QUESTION and any LLM paraphrase
+    using a 'how are you …' / 'how are things' opener. Matches intent, not
+    the exact constant: the constant contains an em-dash that can be
+    normalised in transit, and the LLM sometimes asks the question itself
+    rather than going through the hardcoded return path.
+    """
     for msg in reversed(messages):
         if msg.get("role") == "assistant":
-            return target in _assistant_text(msg).lower()
+            return bool(_WELLBEING_QUESTION_PATTERN.search(_assistant_text(msg)))
     return False
 
 

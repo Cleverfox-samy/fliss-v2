@@ -372,7 +372,10 @@ options FIRST — this is the Home Care page. Search for home care providers and
 those results. Then, after presenting home care options, gently suggest:
 "You might also want to explore our care homes section to compare all your options."
 Do NOT immediately redirect to care homes. The user came to the Home Care page for a
-reason — respect that by showing home care results first."""
+reason — respect that by showing home care results first.
+Never change "home care" to "care homes" just because the user mentions a parent,
+dad, mum, or older relative. Stay in the home care flow unless the user explicitly asks
+to switch to care homes."""
 
 JOBS_EXTRAS = """
 

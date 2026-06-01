@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # Anthropic
     anthropic_api_key: str
-    fliss_model: str = "claude-3-haiku-20240307"
+    fliss_model: str = "claude-haiku-4-5-20251001"
 
     # Google Maps
     google_maps_api_key: str = ""

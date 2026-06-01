@@ -76,28 +76,6 @@ BACKEND_FALLBACK_REPLY = (
     "Are you looking for a care home, home care, or a day nursery?"
 )
 
-CONTEXT_FALLBACK_REPLIES = {
-    "CAREHOME": (
-        "Thanks. I can help with care homes. Who is this for, and are there "
-        "any needs I should prioritise, like dementia care, nursing, respite, "
-        "budget, or location?"
-    ),
-    "HOMECARE": (
-        "Thanks. I can help with home care. Who is this for, and what support "
-        "do they need at home, like personal care, medication, companionship, "
-        "or live-in care?"
-    ),
-    "NURSERY": (
-        "Thanks. I can help with day nurseries. How old is your child, and is "
-        "there anything important like Ofsted rating, outdoor space, SEN "
-        "support, opening hours, or budget?"
-    ),
-    "JOBS": (
-        "Thanks. I can help with care jobs. What role are you looking for, and "
-        "do you need full-time, part-time, or flexible hours?"
-    ),
-}
-
 
 def _normalise_text(value: str) -> str:
     return re.sub(r"\s+", " ", (value or "").strip().lower())
@@ -175,7 +153,7 @@ def _fallback_response(page_type: str) -> QueryResponse:
     return QueryResponse(
         intent="clarify",
         confidence=0.0,
-        answer=CONTEXT_FALLBACK_REPLIES.get(page_type, BACKEND_FALLBACK_REPLY),
+        answer=BACKEND_FALLBACK_REPLY,
         results=[],
     )
 

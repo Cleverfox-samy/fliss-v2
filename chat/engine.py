@@ -370,6 +370,8 @@ class ConversationEngine:
         settings = get_settings()
         self.client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         self.model = settings.fliss_model
+        if self.model == "claude-3-haiku-20240307":
+            self.model = "claude-haiku-4-5-20251001"
         self.frontend_type = frontend_type
         print(f"[DEBUG] frontend_type={self.frontend_type}")
         page_type = FRONTEND_TYPE_TO_PAGE.get(frontend_type, "care_homes")

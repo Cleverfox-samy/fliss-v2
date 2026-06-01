@@ -202,9 +202,16 @@ WHO_INDICATORS = [
     "our ",  # "our mother"
 ]
 
+NURSERY_AGE_PATTERN = re.compile(
+    r"\b(\d{1,2}|one|two|three|four|five)\s*"
+    r"(year|years|yr|yrs|yo|month|months|mths)?\s*(old)?\b",
+    re.IGNORECASE,
+)
 
-def _conversation_mentions_who(messages: list[dict]) -> bool:
+
+def _conversation_mentions_who(messages: list[dict], frontend_type: str | None = None) -> bool:
     """Check if any message in the conversation mentions who the care is for."""
+    is_nursery = (frontend_type or "").upper() == "NURSERY"
     for msg in messages:
         if msg.get("role") != "user":
             continue
@@ -212,6 +219,8 @@ def _conversation_mentions_who(messages: list[dict]) -> bool:
         if not isinstance(content, str):
             continue
         text = content.lower()
+        if is_nursery and NURSERY_AGE_PATTERN.search(text):
+            return True
         for indicator in WHO_INDICATORS:
             if indicator in text:
                 return True
@@ -545,7 +554,7 @@ class ConversationEngine:
                     if block.type == "tool_use":
                         if block.name == "search_listings":
                             # GUARD: Block search if "who" hasn't been mentioned
-                            if not _conversation_mentions_who(messages):
+                            if not _conversation_mentions_who(messages, self.frontend_type):
                                 result_json = json.dumps({
                                     "error": "BLOCKED: Cannot search yet. You must first ask the user who the care is for. Ask a clarifying question like 'And who are you looking for care for?' before searching.",
                                     "action": "ask_who",

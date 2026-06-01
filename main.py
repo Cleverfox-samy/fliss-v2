@@ -224,7 +224,13 @@ async def query(req: QueryRequest):
             logging.exception("Failed to save conversation")
 
         return QueryResponse(**result)
-    except Exception:
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        logging.error(
+            "Failed to process /api/query: %s status=%s",
+            type(exc).__name__,
+            status_code,
+        )
         logging.exception("Failed to process /api/query")
         return _fallback_response(page_type)
 
